@@ -1,0 +1,10 @@
+{
+  "Name": "AutoFisherRL",
+  "Author": "Thiago Lira",
+  "Version": "1.0.0",
+  "Description": "Ha",
+  "UniqueID": "thiagolira.AutoFisherRL",
+  "EntryDll": "AutoFisher-SV.dll",
+  "MinimumApiVersion": "1.0.0",
+  "UpdateKeys": []
+}
