@@ -3,7 +3,8 @@ using System.IO;
 using System.Collections;
 using Newtonsoft.Json;
 using NumSharp;
-
+using NeuralNetwork;
+using NeuralNetwork.Backpropagation;
 
 namespace fishing
 
@@ -12,6 +13,7 @@ namespace fishing
     class RLAgent
 
     {
+
 
         public const double bobberBarPosMax = 432d;
         public const double bobberBarPosMin = 0;

@@ -83,7 +83,7 @@ namespace fishing
 
 
             // apply clicking hack
-            this.Monitor.Log("Loaded HACKERZ CODE lblblbllblbl", LogLevel.Trace);
+            this.Monitor.Log("Added Patches for Mod " + helper.ModRegistry.ModID, LogLevel.Trace);
             MyPatcher.DoPatching();
 
 
@@ -99,9 +99,8 @@ namespace fishing
             }
 
 
-            //log.Silly("Created log and config for mod entry.  Loading Harmony.");
 
-            //log.Silly("Loading event handlers");
+            this.Monitor.Log("Loading event handlers", LogLevel.Trace);
 
             helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
             helper.Events.Player.InventoryChanged += OnInventoryChanged;
@@ -165,8 +164,6 @@ namespace fishing
                 // No treasures to mess with training!
                 Helper.Reflection.GetField<bool>(bar, "treasure").SetValue(false);
 
-
-
             }
 
             if (args.NewMenu is ItemGrabMenu menu)
@@ -176,9 +173,6 @@ namespace fishing
                 
             }
            
-           
-
-
         }
 
         private void OnInventoryChanged(object sender, InventoryChangedEventArgs args)
@@ -208,17 +202,10 @@ namespace fishing
             player.stamina = player.MaxStamina;
 
 
-
-
             if (player == null || !player.IsLocalPlayer)
                 return;
             if (!(Game1.player.CurrentTool is FishingRod))
                 return;
-
-
-
-           
-
 
             FishingRod rod = Game1.player.CurrentTool as FishingRod;
 
@@ -256,9 +243,6 @@ namespace fishing
             if (ShouldDoDismissCaughtPopup(rod))
             {
                 //log.Trace("Tool is sitting at caught fish popup");
-
-
-
                 //log.Trace("Closing popup with Harmony");
                 ClickAtAllHack.simulateClick = true;
 
