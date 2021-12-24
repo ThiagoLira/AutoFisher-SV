@@ -3,7 +3,7 @@ using System.IO;
 using System.Collections;
 using Newtonsoft.Json;
 using NumSharp;
-using NeuralNetwork;
+using ArtificialNeuralNetwork;
 using NeuralNetwork.Backpropagation;
 
 namespace fishing
@@ -14,6 +14,8 @@ namespace fishing
 
     {
 
+        // n_input, n_output, n_layers, dim_hidden
+        public INeuralNetwork network = ArtificialNeuralNetwork.Factories.NeuralNetworkFactory.GetInstance().Create(3, 1, 1, 5);
 
         public const double bobberBarPosMax = 432d;
         public const double bobberBarPosMin = 0;

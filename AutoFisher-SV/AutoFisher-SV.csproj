@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="NeuralNetwork" Version="7.4.0" />
     <PackageReference Include="NeuralNetwork.Backpropagation" Version="1.0.0" />
     <PackageReference Include="NumSharp" Version="0.30.0" />
     <PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.0.0" />
