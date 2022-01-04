@@ -14,236 +14,133 @@ namespace fishing
 
     {
 
+        // the AI can CLICK or NOT CLICK
+        private const int nActions = 2;
+
+        private const int stateSize = 3;
+
         // n_input, n_output, n_layers, dim_hidden
-        public INeuralNetwork network = ArtificialNeuralNetwork.Factories.NeuralNetworkFactory.GetInstance().Create(3, 1, 1, 5);
+        private INeuralNetwork targetNetwork;
+        private INeuralNetwork predictionNetwork;
 
-        public const double bobberBarPosMax = 432d;
-        public const double bobberBarPosMin = 0;
+        private const double bobberBarPosMax = 432d;
+        private const double bobberBarPosMin = 0;
 
-        public const double bobberBarSpeedMax = 16.8;
-        public const double bobberBarSpeedMin = -16.8;
+        private const double bobberBarSpeedMax = 16.8;
+        private const double bobberBarSpeedMin = -16.8;
 
-        public const double bobberPositionMax = 526.001d;
-        public const double bobberPositionMin = 0;
+        private const double bobberPositionMax = 526.001d;
+        private const double bobberPositionMin = 0;
 
-        public const double distVictoryMax = 1;
-        public const double distVictoryMin = 0;
+        private const double distVictoryMax = 1;
+        private const double distVictoryMin = 0;
 
         // new variable BobberPos - BobberBarPos 
-        public const double diffBobberFishMax = 508.0d;
-        public const double diffBobberFishMin = -432.0d;
+        private const double diffBobberFishMax = 508.0d;
+        private const double diffBobberFishMin = -432.0d;
 
-
-        // for discretization purposes
-        // https://pythonprogramming.net/q-learning-reinforcement-learning-python-tutorial/
-
-
-        // first 3 entries are number of discrete values to be taken by each variable on a state
-        public NDArray nBuckets = np.array(new double[] { 20,20,20 });
-
-        // the AI can CLICK or NOT CLICK
-        public int nActions = 2;
-
-        public NDArray DiscreteStep = new double[3];
-
-        public NDArray QTable;
 
 
         // Q-learning settings
-        public float LearningRate = 0.6F;
 
-        public float Discount = 0.2F;
+        private const double epsilon = 0.3F;
 
-        //private Logger Log;
+        private const float learningRate = 0.6F;
 
-        private int NumItersElapsed = 0;
+        private const float discount = 0.2F;
 
-        private double[] RewardBuffer = new double[10000];
+        private const int stateMemorySize = 1000;
 
-        public double GetMeanReward()
+        // number of iterations to copy prediction network parameters to target network
+        private const int C = 50;
+
+        private Stack stateMemory;
+
+        private int numItersElapsed;
+
+        Random random;
+
+
+        public void ReadSerializedNetwork()
         {
-
-            double sum = 0;
-            Array.ForEach(RewardBuffer, delegate (double i) { sum += i; });
-
-            return sum / (double)(Math.Min(NumItersElapsed, 10000));
-
-        }
-
-
-        public void ReadQTableFromJson()
-        {
-            using (StreamReader r = new StreamReader("QTable.json"))
-            {
-                string json = r.ReadToEnd();
-
-                double[,,,] temp = JsonConvert.DeserializeObject<double[,,,] >(json);
-
-
-
-                try
-                {
-                    this.QTable = NDArray.FromMultiDimArray<double>(temp);
-
-                    this.QTable.reshape(new int[] { 1+ Convert.ToInt32((double) nBuckets[0]),
-                                                    1+ Convert.ToInt32((double) nBuckets[1]),
-                                                    1+ Convert.ToInt32((double) nBuckets[2]),
-                                                    nActions });
-
-                    //Log.Log("Successfuly loaded QTable from json");
-
-                }
-                catch (Exception e)
-                {
-                    //Log.Log("WARNING Mismatch on QTable size stored on Json");
-                }
-
-            }
+          // read network from serialized
 
 
         }
-        public void DumpQTableJson()
+        public void DumpSerializedNetwork()
         {
-            string json = JsonConvert.SerializeObject(this.QTable.ToMuliDimArray<double>());
+            // dump network from serialized
 
-            System.IO.File.WriteAllText(@"QTable.json", json);
+        }
+
+        public RLAgent()
+        {
+            targetNetwork = ArtificialNeuralNetwork.Factories.NeuralNetworkFactory.GetInstance().Create(stateSize, nActions, 1, 5);
+            predictionNetwork = ArtificialNeuralNetwork.Factories.NeuralNetworkFactory.GetInstance().Create(stateSize, nActions, 1, 5);
+
+            stateMemory = new Stack();
+            random = new Random();
 
 
         }
 
 
-
-        public int[] DiscretizeState(double[] state)
+        public int Update(double[] olderState, double[] oldState, double[] newState)
         {
 
-            int[] temp = new int[3];
+            numItersElapsed++;
 
-
-            if (state[0] > bobberBarPosMax)
-            {
-                //Log.Log($"MAX BOBBERBARPOS {state[0]}");
-            }
-            if (state[1] > bobberPositionMax)
-            {
-                //Log.Log($"MAX bobberPositionMax {state[1]}");
-
-            }
-            if (state[2] > bobberBarSpeedMax)
-            {
-                //Log.Log($"MAX bobberBarSpeedMax {state[2]}");
-
-            }
-
-            temp[0] = (int)Math.Floor((double)((state[0] - bobberBarPosMin) / DiscreteStep[0]));
-            temp[1] = (int)Math.Floor((double)((state[1] - bobberPositionMin) / DiscreteStep[1]));
-            temp[2] = (int)Math.Floor((double)((state[2] - bobberBarSpeedMin) / DiscreteStep[2]));
-
-
-            return temp;
-
-
-        }
-
-
-        public RLAgent()//(Logger log)
-        {
-
-
-
-
-            // calculate the increment on each discretized feature 
-            // this is then used to create "buckets" on the Q-table for each possible state
-            DiscreteStep[0] = (bobberBarPosMax - bobberBarPosMin) / nBuckets[0];
-            DiscreteStep[1] = (bobberPositionMax - bobberPositionMin) / nBuckets[1];
-            DiscreteStep[2] = (bobberBarSpeedMax - bobberBarSpeedMin) / nBuckets[2];
-
-
-
-            // initialize Q-table
-            // one more position since the last bucket is indexed by the arraysize instead of arraysize -1 
-            // optimistic start 
-            QTable = np.random.uniform(4, 5, new int[] { 1+ Convert.ToInt32((double) nBuckets[0]),
-                                                          1+ Convert.ToInt32((double) nBuckets[1]),
-                                                          1+ Convert.ToInt32((double) nBuckets[2]),
-                                                          nActions });
-
-
-
-            //Log = log;
-
-
-        }
-
-
-        public int Update(double[] OlderState, double[] OldState, double[] NewState)
-        {
-
-
-            NumItersElapsed++;
-
-            
-
-
-            int BestAction;
-
-            // DistanceFromCatch
-            // the closer the agent is better the reward
-            // this way we don't have many local minima
-
-            int[] DOldState = DiscretizeState(OldState);
-            int[] DNewState = DiscretizeState(NewState);
+            int bestAction;
 
             // simple difference of winning bar height
-            double reward = OldState[3] - OlderState[3];
+            double reward = oldState[3] - olderState[3];
 
+            // forward propagate on network
+            predictionNetwork.SetInputs(newState);
+            targetNetwork.SetInputs(newState);
+
+            double[] predictionOutput = predictionNetwork.GetOutputs();
+            // output is of the form [Q_value_action_0, Q_value_action_1]
+            // with epsilon probability we get a random action from predictionOutput
+            // otherwise we get the action corresponding with the maximum Q-value sampled by the network
+            if (random.NextDouble() > epsilon)
+            {
+                bestAction = (int) (random.NextDouble() * 2.0);
+            }
+            else
+            {
+                bestAction = np.argmax(predictionOutput);
+            }
             
-            // update reward buffer
-            RewardBuffer[NumItersElapsed % 10000] = reward;
+            double[] targetOutput = targetNetwork.GetOutputs();
+
+
+            // store memory < s,a,r,s’>
+            //(double[], double[], int, double) state_tuple = (predictionOutput,targetOutput,bestAction,reward);
+            stateMemory.Push(predictionOutput);
            
-
-
-
-            try
+            if (numItersElapsed > C)
             {
-                // array with q values for 2 possible actions
-                BestAction = np.argmax(QTable[DOldState[0], DOldState[1], DOldState[2]]);
-
-               
-
-                QTable[DOldState[0], DOldState[1], DOldState[2]][BestAction] = QTable[DOldState[0], DOldState[1], DOldState[2]][BestAction] + 
-                                    LearningRate * ( reward + Discount * np.max(QTable[DNewState[0], DNewState[1], DNewState[2]]) - QTable[DOldState[0], DOldState[1], DOldState[2]][BestAction]);
-
-
-
-            }
-            catch (Exception e)
-            {
-                //Log.Log($"Qtable shape: {QTable.shape[0]}");
-                //Log.Log($"Qtable shape1: {QTable.shape[1]}");
-                //Log.Log($"Qtable shape2: {QTable.shape[2]}");
-                //Log.Log(e.Message);
-                //Log.Log($"New State: \n " +
-                 // $"{DOldState[0]} \n" +
-                  //$"{DOldState[1]} \n" +
-                  //$"{DOldState[2]} \n");
-
-                return 0;
+                // copy prediction network to target network
+                numItersElapsed = 0;
             }
 
+            BackPropagateNetwork();
 
-            /*
-            Log.Log("-----------------------------------------------");
-
-            Log.Log($"Current State: \n " +
-             $"{DOldState[0]} \n" +
-             $"{DOldState[1]} \n" +
-             $"{DOldState[2]} \n");
-            Log.Log($" Last reward : {reward}");
-            Log.Log($" Mean Reward : {GetMeanReward()} ");
-            */
-            return BestAction;
+      
+            return bestAction;
 
         }
+
+        public void BackPropagateNetwork() 
+        {
+
+            double[] outputs = stateMemory.Pop();
+
+            Backpropagater bp = new Backpropagater(predictionNetwork, 1e-2, 1,1, false);
+            bp.Backpropagate(outputs);
+        }
+
 
 
     }
