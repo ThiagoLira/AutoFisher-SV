@@ -1,14 +1,13 @@
 ﻿using System;
-using System.IO;
 using System.Collections;
-using Newtonsoft.Json;
 using NumSharp;
 using ArtificialNeuralNetwork;
 using NeuralNetwork.Backpropagation;
+using System.Collections.Generic;
+using Microsoft.ML.OnnxRuntime;
+
 
 namespace fishing
-
-
 {
     class RLAgent
 
@@ -19,7 +18,6 @@ namespace fishing
 
         private const int stateSize = 3;
 
-        // n_input, n_output, n_layers, dim_hidden
         private INeuralNetwork targetNetwork;
         private INeuralNetwork predictionNetwork;
 
@@ -49,12 +47,10 @@ namespace fishing
 
         private const float discount = 0.2F;
 
-        private const int stateMemorySize = 1000;
-
         // number of iterations to copy prediction network parameters to target network
         private const int C = 50;
 
-        private Stack stateMemory;
+        private List<Double[]> stateMemory;
 
         private int numItersElapsed;
 
@@ -78,9 +74,9 @@ namespace fishing
             targetNetwork = ArtificialNeuralNetwork.Factories.NeuralNetworkFactory.GetInstance().Create(stateSize, nActions, 1, 5);
             predictionNetwork = ArtificialNeuralNetwork.Factories.NeuralNetworkFactory.GetInstance().Create(stateSize, nActions, 1, 5);
 
-            stateMemory = new Stack();
+            stateMemory = new List<Double[]>();
             random = new Random();
-
+            //var session = new InferenceSession(modelFilePath, options);        // n_input, n_output, n_layers, dim_hidden
 
         }
 
@@ -114,10 +110,11 @@ namespace fishing
             
             double[] targetOutput = targetNetwork.GetOutputs();
 
+            // {Q_0, Q_1}
 
             // store memory < s,a,r,s’>
-            //(double[], double[], int, double) state_tuple = (predictionOutput,targetOutput,bestAction,reward);
-            stateMemory.Push(predictionOutput);
+            // (double[], double[], int, double) state_tuple = (predictionOutput,targetOutput,bestAction,reward);
+            stateMemory.Add(predictionOutput);
            
             if (numItersElapsed > C)
             {
@@ -135,10 +132,12 @@ namespace fishing
         public void BackPropagateNetwork() 
         {
 
-            double[] outputs = stateMemory.Pop();
+            // sample some data from stateMemory
 
-            Backpropagater bp = new Backpropagater(predictionNetwork, 1e-2, 1,1, false);
-            bp.Backpropagate(outputs);
+            //double[] outputs = stateMemory;
+
+            //Backpropagater bp = new Backpropagater(predictionNetwork, 1e-2, 1,1, false);
+            //bp.Backpropagate(outputs);
         }
 
 
