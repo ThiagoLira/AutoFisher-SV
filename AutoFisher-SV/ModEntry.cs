@@ -32,7 +32,10 @@ namespace fishing
         float distanceFromCatching = 0;
 
         // store model's last state between updates
-        double[] StateBuffer = { 0, 0, 0, 0 };
+        double[] stateBuffer = { 0, 0, 0, 0 };
+        // store model's last action between updates
+        bool actionBuffer = false;
+
 
         public double[,] replayMemory;
 
@@ -46,8 +49,9 @@ namespace fishing
 
         const string datasetFile = "replayMemory.csv";
 
-        const int JARBAS = 5;
+        const int bufferSize = 200;
 
+        const bool shouldStoreDataset = false;
 
         /*********
         ** Public methods
@@ -88,9 +92,7 @@ namespace fishing
         public override void Entry(IModHelper helper)
         {
 
-            
-
-            replayMemory = new double[JARBAS, 8];
+            replayMemory = new double[bufferSize, 8];
 
             if (!File.Exists(datasetFile))
             {
@@ -100,7 +102,7 @@ namespace fishing
             }
             else
             {
-                this.Monitor.Log("Already exists" + helper.ModRegistry.ModID, LogLevel.Info);
+                this.Monitor.Log("Dataset File Already exists" + helper.ModRegistry.ModID, LogLevel.Info);
             }
 
             // apply clicking hack
@@ -232,8 +234,7 @@ namespace fishing
 
 
 
-            // 6x per second
-            if (args.IsMultipleOf(10))
+            if (args.IsMultipleOf(5))
             {
 
                 //IsButtonDownHack.simulateDown = false;
@@ -246,12 +247,13 @@ namespace fishing
 
                     double diffBobberFish = bobberPosition - bobberBarPos;
 
+                    // get values from last time update ran
                     double[] OldState = new double[] { (double)bobberBarPos, (double)bobberPosition, (double)bobberBarSpeed};
 
                     // if is the first iteration StateBuffer don't have anything
                     if (CountFishes == 0)
                     {
-                        StateBuffer = OldState;
+                        stateBuffer = OldState;
                     }
 
 
@@ -272,52 +274,46 @@ namespace fishing
 
                     int rand = rnd.Next(100);
 
-                    //best_action = (int) Agent.Update(StateBuffer,OldState, NewState);
-
-                    if (rand < 5)
-                    {
-                        rand = 0;
-                        // explore random action and it's outcome 
-                        //best_action = rnd.Next(1);
-                    }
-
-
+                    best_action = (int) Agent.Update(NewState);
 
                     // execute action if needed
-                    if (false)
+                    if (best_action==0)
                     {
-                        //IsButtonDownHack.simulateDown = true;
+                        IsButtonDownHack.simulateDown = true;
                     }
                     else
                     {
-                        // do NOTHING
-                        //IsButtonDownHack.simulateDown = false;
+                        IsButtonDownHack.simulateDown = false;
 
                     }
 
 
                     // store last state
-                    StateBuffer = OldState;
+                    stateBuffer = OldState;
+                     
 
                     
                     // [1000][8]
                     // <S_t-1, S_t, a_t-1, r_t> -> a_t
+                    // state from last update
                     replayMemory[updateCounter,0] = OldState[0];
                     replayMemory[updateCounter,1] = OldState[1];
                     replayMemory[updateCounter,2] = OldState[2];
+                    // state from this update
                     replayMemory[updateCounter,3] = NewState[0];
                     replayMemory[updateCounter,4] = NewState[1];
                     replayMemory[updateCounter,5] = NewState[2];
+                    // reward from this update
                     replayMemory[updateCounter,6] = reward;
-                    //ERRADO
-                    replayMemory[updateCounter,7] = action? 1 : 0;
+                    // action from last update
+                    replayMemory[updateCounter,7] = actionBuffer? 1 : 0;
 
                     // if memory is full dump everything on csv file and reset memory 
-                    if (updateCounter == JARBAS - 1)
+                    if (updateCounter == bufferSize - 1 && shouldStoreDataset)
                     {
                         List<string> iterRows = new List<string>();
 
-                        for (int i = 0; i < JARBAS; i++)
+                        for (int i = 0; i < bufferSize; i++)
                         {
                             
                             string csvRow = string.Format("{0},{1},{2},{3},{4},{5},{6},{7}",
@@ -335,13 +331,17 @@ namespace fishing
 
                         File.AppendAllLines(datasetFile, iterRows);
 
-                        this.Monitor.Log("Dumped 1000 entries in dataset" + this.Helper.ModRegistry.ModID,LogLevel.Info);
+                        this.Monitor.Log("Dumped 200 entries in dataset" + this.Helper.ModRegistry.ModID,LogLevel.Info);
                         updateCounter=0;
                     }
                     else
                     {
                         updateCounter++;
                     }
+
+
+                    // store last action
+                    actionBuffer = action;
                 }
 
 
