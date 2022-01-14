@@ -49,9 +49,9 @@ namespace fishing
 
         const string datasetFile = "replayMemory.csv";
 
-        const int bufferSize = 200;
+        const int bufferSize = 1000;
 
-        const bool shouldStoreDataset = false;
+        const bool shouldStoreDataset = true;
 
         /*********
         ** Public methods
@@ -110,7 +110,7 @@ namespace fishing
             MyPatcher.DoPatching();
 
 
-            Agent = new RLAgent();
+            Agent = new RLAgent(this.Monitor);
 
             this.Monitor.Log("Loading event handlers", LogLevel.Trace);
 
@@ -234,7 +234,7 @@ namespace fishing
 
 
 
-            if (args.IsMultipleOf(5))
+            if (args.IsMultipleOf(1))
             {
 
                 //IsButtonDownHack.simulateDown = false;
@@ -268,25 +268,44 @@ namespace fishing
 
                     double[] NewState = new double[] { (double)bobberBarPos, (double)bobberPosition, (double)bobberBarSpeed};
 
-                    // detect if mouse is currently pressed
-                    bool action = this.Helper.Input.IsDown(SButton.MouseLeft);
+
                     double reward = distanceFromCatching; 
 
                     int rand = rnd.Next(100);
 
                     best_action = (int) Agent.Update(NewState);
 
-                    // execute action if needed
-                    if (best_action==0)
+                    // execute random action
+                    // 50% chance of being RANDOM
+                    if (rand > 100)
                     {
-                        IsButtonDownHack.simulateDown = true;
+                        if (rand < 50)
+                        {
+                            IsButtonDownHack.simulateDown = true;
+                        }
+                        else
+                        {
+                            IsButtonDownHack.simulateDown = false;
+
+                        }
                     }
                     else
                     {
-                        IsButtonDownHack.simulateDown = false;
+                        // execute action if needed
+                        if (best_action == 1)
+                        {
+                            IsButtonDownHack.simulateDown = true;
+                        }
+                        else
+                        {
+                            IsButtonDownHack.simulateDown = false;
 
+                        }
                     }
 
+                    // detect if mouse is currently pressed
+                    // pressed -> TRUE, unpressed -> FALSE
+                    bool action = this.Helper.Input.IsDown(SButton.MouseLeft);
 
                     // store last state
                     stateBuffer = OldState;
@@ -331,7 +350,8 @@ namespace fishing
 
                         File.AppendAllLines(datasetFile, iterRows);
 
-                        this.Monitor.Log("Dumped 200 entries in dataset" + this.Helper.ModRegistry.ModID,LogLevel.Info);
+                        this.Monitor.Log("Dumped 1000 entries in dataset" + this.Helper.ModRegistry.ModID,LogLevel.Info);
+                        Agent.reloadModel();
                         updateCounter=0;
                     }
                     else

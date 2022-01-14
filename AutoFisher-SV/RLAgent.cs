@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using System.Linq;
+using StardewModdingAPI;
 
 namespace fishing
 {
@@ -18,12 +19,12 @@ namespace fishing
 
         private InferenceSession session;
         const string modelPath = "Mods/AutoFisher-SV/assets/policy_net.onnx";
+        private IMonitor logger;
 
-
-        public RLAgent()
+        public RLAgent(IMonitor monitor)
         {
 
-
+            logger = monitor;
 
             SessionOptions options = new SessionOptions();
             options.LogSeverityLevel = OrtLoggingLevel.ORT_LOGGING_LEVEL_ERROR;
@@ -37,6 +38,15 @@ namespace fishing
 
         }
 
+
+        public void reloadModel()
+        {
+            this.logger.Log("Model RELOADED", StardewModdingAPI.LogLevel.Trace);
+            SessionOptions options = new SessionOptions();
+            options.LogSeverityLevel = OrtLoggingLevel.ORT_LOGGING_LEVEL_ERROR;
+            options.AppendExecutionProvider_CPU(1);
+            session = new InferenceSession(modelPath, options);
+        }
 
         public int Update(double[] currentState)
         {
@@ -52,11 +62,21 @@ namespace fishing
             {
                 NamedOnnxValue.CreateFromTensor<double>("0", input)
             };
-        
+
+
+            // this.logger.Log("NN input: " + string.Join(", ", input.ToList()), StardewModdingAPI.LogLevel.Trace);
+
             using (var results = session.Run(inputs))
             {
-                var maxValue = results.Max();
-                var maxIndex = results.ToList().IndexOf(maxValue);
+
+                Tensor<double> outputs = results.First().AsTensor<double>();
+
+                // this.logger.Log("NN output: " + string.Join(", ", outputs.ToList()), StardewModdingAPI.LogLevel.Trace);
+
+                var maxValue = outputs.Max();
+                var maxIndex = outputs.ToList().IndexOf(maxValue);
+                // this.logger.Log("Taking action: " + maxIndex, StardewModdingAPI.LogLevel.Trace);
+
                 return maxIndex;
             }
             
