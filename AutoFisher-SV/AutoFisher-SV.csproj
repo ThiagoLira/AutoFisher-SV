@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net5.0</TargetFramework>
@@ -6,9 +6,14 @@
 	  <GamePath>C:\Program Files (x86)\Steam\steamapps\common\Stardew Valley</GamePath>
 	  <EnableHarmony>true</EnableHarmony>
 	  <BundleExtraAssemblies>ThirdParty</BundleExtraAssemblies>
+	  <BundleExtraAssemblies>System</BundleExtraAssemblies>
+
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.10.0" />
+    <PackageReference Include="NeuralNetwork" Version="7.4.0" />
+    <PackageReference Include="NeuralNetwork.Backpropagation" Version="1.0.0" />
     <PackageReference Include="NumSharp" Version="0.30.0" />
     <PackageReference Include="Pathoschild.Stardew.ModBuildConfig" Version="4.0.0" />
   </ItemGroup>

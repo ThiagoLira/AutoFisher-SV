@@ -5,17 +5,16 @@ using StardewValley;
 using StardewValley.Menus;
 using StardewValley.Tools;
 using System;
-
+using System.IO;
+using System.Collections.Generic;
 
 namespace fishing
 {
 
-    
+
     /// <summary>The mod entry point.</summary>
     public class ModEntry : Mod
     {
-
-
 
         private int CountFishes = 0;
         private bool IsFishing = false;
@@ -33,8 +32,26 @@ namespace fishing
         float distanceFromCatching = 0;
 
         // store model's last state between updates
-        double[] StateBuffer = { 0, 0, 0 ,0};
+        double[] stateBuffer = { 0, 0, 0, 0 };
+        // store model's last action between updates
+        bool actionBuffer = false;
 
+
+        public double[,] replayMemory;
+
+        public int updateCounter = 0;
+
+        public bool autoCastRod = true;
+
+        Random rnd = new Random();
+
+        private RLAgent Agent;
+
+        const string datasetFile = "replayMemory.csv";
+
+        const int bufferSize = 1000;
+
+        const bool shouldStoreDataset = true;
 
         /*********
         ** Public methods
@@ -68,46 +85,38 @@ namespace fishing
         }
 
 
-        public bool autoCastRod = true;
 
-        Random rnd = new Random();
-
-
-        private RLAgent Agent;
 
         /// <summary>The mod entry point, called after the mod is first loaded.</summary>
         /// <param name="helper">Provides simplified APIs for writing mods.</param>
         public override void Entry(IModHelper helper)
         {
 
+            replayMemory = new double[bufferSize, 8];
 
+            if (!File.Exists(datasetFile))
+            {
+                File.CreateText(datasetFile);
+                this.Monitor.Log("Created Dataset File" + helper.ModRegistry.ModID, LogLevel.Info);
+
+            }
+            else
+            {
+                this.Monitor.Log("Dataset File Already exists" + helper.ModRegistry.ModID, LogLevel.Info);
+            }
 
             // apply clicking hack
-            this.Monitor.Log("Loaded HACKERZ CODE lblblbllblbl", LogLevel.Trace);
+            this.Monitor.Log("Added Patches for Mod " + helper.ModRegistry.ModID, LogLevel.Info);
             MyPatcher.DoPatching();
 
 
-            Agent = new RLAgent();
+            Agent = new RLAgent(this.Monitor);
 
-            try
-            {
-                Agent.ReadQTableFromJson();
-            }
-            catch (Exception e)
-            {
-                //log.Log(e.Message);
-            }
-
-
-            //log.Silly("Created log and config for mod entry.  Loading Harmony.");
-
-            //log.Silly("Loading event handlers");
+            this.Monitor.Log("Loading event handlers", LogLevel.Trace);
 
             helper.Events.GameLoop.UpdateTicked += OnUpdateTicked;
             helper.Events.Player.InventoryChanged += OnInventoryChanged;
             helper.Events.Display.MenuChanged += OnMenuChanged;
-
-
 
         }
 
@@ -130,32 +139,6 @@ namespace fishing
             if (args.NewMenu is BobberBar bar)
             {
 
-
-
-                // every 100 iterations increase discount i.e. future matters more than learning
-                if (CountFishes % 100 == 0)
-                {
-                    Agent.Discount += 0.1f;
-                    Agent.LearningRate -= 0.1f;
-
-                    if (Agent.Discount > 0.9)
-                    {
-                        Agent.Discount = 0.9f;
-                    }
-
-                    if (Agent.LearningRate < 0.1)
-                    {
-                        Agent.LearningRate = 0.1f;
-                    }
-
-                    //log.Log($"LR = {Agent.LearningRate} D = {Agent.Discount}");
-                }
-
-
-
-                //log.Log("Dumping QTable");
-                Agent.DumpQTableJson();
-
                 CountFishes++;
 
                 //log.Log($"Fish #{CountFishes}");
@@ -165,19 +148,14 @@ namespace fishing
                 // No treasures to mess with training!
                 Helper.Reflection.GetField<bool>(bar, "treasure").SetValue(false);
 
-
-
             }
 
             if (args.NewMenu is ItemGrabMenu menu)
             {
                 // JUST... JUST LEAVE ME BE
                 menu.exitThisMenu();
-                
-            }
-           
-           
 
+            }
 
         }
 
@@ -208,17 +186,10 @@ namespace fishing
             player.stamina = player.MaxStamina;
 
 
-
-
             if (player == null || !player.IsLocalPlayer)
                 return;
             if (!(Game1.player.CurrentTool is FishingRod))
                 return;
-
-
-
-           
-
 
             FishingRod rod = Game1.player.CurrentTool as FishingRod;
 
@@ -256,9 +227,6 @@ namespace fishing
             if (ShouldDoDismissCaughtPopup(rod))
             {
                 //log.Trace("Tool is sitting at caught fish popup");
-
-
-
                 //log.Trace("Closing popup with Harmony");
                 ClickAtAllHack.simulateClick = true;
 
@@ -266,28 +234,26 @@ namespace fishing
 
 
 
-            // 6x per second
-            
-
-            if (args.IsMultipleOf(10))
+            if (args.IsMultipleOf(1))
             {
 
-                IsButtonDownHack.simulateDown = false;
+                //IsButtonDownHack.simulateDown = false;
 
                 if (Game1.activeClickableMenu is BobberBar bar)
                 {
 
 
-                    int  best_action;
+                    int best_action;
 
                     double diffBobberFish = bobberPosition - bobberBarPos;
 
-                    double[] OldState = new double[] { (double)bobberBarPos, (double)bobberPosition, (double)bobberBarSpeed, (double)distanceFromCatching };
+                    // get values from last time update ran
+                    double[] OldState = new double[] { (double)bobberBarPos, (double)bobberPosition, (double)bobberBarSpeed};
 
                     // if is the first iteration StateBuffer don't have anything
                     if (CountFishes == 0)
                     {
-                        StateBuffer = OldState;
+                        stateBuffer = OldState;
                     }
 
 
@@ -300,45 +266,107 @@ namespace fishing
 
                     diffBobberFish = bobberPosition - bobberBarPos;
 
-                    double [] NewState = new double[] { (double)bobberBarPos, (double) bobberPosition, (double)bobberBarSpeed, (double)distanceFromCatching };
+                    double[] NewState = new double[] { (double)bobberBarPos, (double)bobberPosition, (double)bobberBarSpeed};
 
+
+                    double reward = distanceFromCatching; 
 
                     int rand = rnd.Next(100);
 
-                    best_action = (int) Agent.Update(StateBuffer,OldState, NewState);
+                    best_action = (int) Agent.Update(NewState);
 
-                    if (rand < 5)
+                    // execute random action
+                    // 50% chance of being RANDOM
+                    if (rand > 100)
                     {
-                        rand = 0;
-                        // explore random action and it's outcome 
-                        //best_action = rnd.Next(1);
-                    }
-                    
+                        if (rand < 50)
+                        {
+                            IsButtonDownHack.simulateDown = true;
+                        }
+                        else
+                        {
+                            IsButtonDownHack.simulateDown = false;
 
-
-                    // execute action if needed
-                    if (best_action == 1 )
-                    {
-                        IsButtonDownHack.simulateDown = true;
+                        }
                     }
                     else
                     {
-                        // do NOTHING
-                        //IsButtonDownHack.simulateDown = false;
+                        // execute action if needed
+                        if (best_action == 1)
+                        {
+                            IsButtonDownHack.simulateDown = true;
+                        }
+                        else
+                        {
+                            IsButtonDownHack.simulateDown = false;
 
+                        }
+                    }
+
+                    // detect if mouse is currently pressed
+                    // pressed -> TRUE, unpressed -> FALSE
+                    bool action = this.Helper.Input.IsDown(SButton.MouseLeft);
+
+                    // store last state
+                    stateBuffer = OldState;
+                     
+
+                    
+                    // [1000][8]
+                    // <S_t-1, S_t, a_t-1, r_t> -> a_t
+                    // state from last update
+                    replayMemory[updateCounter,0] = OldState[0];
+                    replayMemory[updateCounter,1] = OldState[1];
+                    replayMemory[updateCounter,2] = OldState[2];
+                    // state from this update
+                    replayMemory[updateCounter,3] = NewState[0];
+                    replayMemory[updateCounter,4] = NewState[1];
+                    replayMemory[updateCounter,5] = NewState[2];
+                    // reward from this update
+                    replayMemory[updateCounter,6] = reward;
+                    // action from last update
+                    replayMemory[updateCounter,7] = actionBuffer? 1 : 0;
+
+                    // if memory is full dump everything on csv file and reset memory 
+                    if (updateCounter == bufferSize - 1 && shouldStoreDataset)
+                    {
+                        List<string> iterRows = new List<string>();
+
+                        for (int i = 0; i < bufferSize; i++)
+                        {
+                            
+                            string csvRow = string.Format("{0},{1},{2},{3},{4},{5},{6},{7}",
+                                                                                replayMemory[i,0],
+                                                                                replayMemory[i,1],
+                                                                                replayMemory[i,2],
+                                                                                replayMemory[i,3],
+                                                                                replayMemory[i,4],
+                                                                                replayMemory[i,5],
+                                                                                replayMemory[i,6],
+                                                                                replayMemory[i,7]); 
+                            iterRows.Add(csvRow);
+                        }
+                        
+
+                        File.AppendAllLines(datasetFile, iterRows);
+
+                        this.Monitor.Log("Dumped 1000 entries in dataset" + this.Helper.ModRegistry.ModID,LogLevel.Info);
+                        Agent.reloadModel();
+                        updateCounter=0;
+                    }
+                    else
+                    {
+                        updateCounter++;
                     }
 
 
-                    // store last state
-
-                    StateBuffer = OldState;
-
-
+                    // store last action
+                    actionBuffer = action;
                 }
 
 
             }
-       
+
         }
 
 
