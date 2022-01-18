@@ -27,6 +27,8 @@ namespace fishing
         float bobberBarSpeed = 0;
         // this is the fish 
         float bobberPosition = 15;
+        // this is bar height
+        int bobberBarHeight = 10;
         // reward
         // from 0 to 1
         float distanceFromCatching = 0;
@@ -49,7 +51,7 @@ namespace fishing
 
         const string datasetFile = "replayMemory.csv";
 
-        const int bufferSize = 1000;
+        const int bufferSize = 500;
 
         const bool shouldStoreDataset = true;
 
@@ -233,7 +235,6 @@ namespace fishing
             }
 
 
-
             if (args.IsMultipleOf(1))
             {
 
@@ -261,6 +262,10 @@ namespace fishing
                     bobberBarPos = Helper.Reflection.GetField<float>(bar, "bobberBarPos").GetValue();
                     bobberBarSpeed = Helper.Reflection.GetField<float>(bar, "bobberBarSpeed").GetValue();
                     bobberPosition = Helper.Reflection.GetField<float>(bar, "bobberPosition").GetValue();
+
+                    // how does this work?
+                    bobberBarHeight = Helper.Reflection.GetField<int>(bar, "bobberBarHeight").GetValue();
+
                     distanceFromCatching = Helper.Reflection.GetField<float>(bar, "distanceFromCatching").GetValue();
 
 
@@ -279,7 +284,7 @@ namespace fishing
                     // 50% chance of being RANDOM
                     if (rand > 100)
                     {
-                        if (rand < 50)
+                        if (rand < 75)
                         {
                             IsButtonDownHack.simulateDown = true;
                         }
